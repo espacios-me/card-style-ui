@@ -1,0 +1,359 @@
+```react
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { 
+  Search, 
+  ArrowLeft, 
+  X, 
+  Send, 
+  MapPin, 
+  Building2, 
+  School, 
+  Hospital, 
+  ShoppingBag,
+  Clock,
+  ChevronRight,
+  BarChart3,
+  Home,
+  User,
+  MoreHorizontal,
+  ArrowUpRight,
+  Circle,
+  Activity,
+  PieChart,
+  MessageCircle,
+  Download
+} from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  onAuthStateChanged, 
+  signInAnonymously, 
+  signOut 
+} from 'firebase/auth';
+
+// --- INITIALIZATION ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+// --- DATA ENGINE (Espacios 547 Registry) ---
+const fetchMasterData = () => {
+  const projectNames = [
+    "Grand Polo Club", "Equiterra", "Palm Beach Towers", "The Heights", "Dubai Mansions", 
+    "Rixos Residences", "District One Naya", "The Acres", "Asora Bay", "Atélis at d3"
+  ];
+  const developers = ['Emaar', 'Nakheel', 'Meraas', 'Damac', 'Sobha', 'Ellington'];
+  const locations = ['Dubai Hills', 'Palm Jumeirah', 'Dubai South', 'Downtown', 'DIP', 'Expo City'];
+  
+  return Array.from({ length: 547 }).map((_, i) => {
+    const id = i + 1;
+    const loc = locations[i % locations.length];
+    const yieldVal = (Math.random() * 4 + 4.5).toFixed(1);
+    
+    let size = 'sm';
+    if (id % 15 === 0) size = 'lg'; 
+    else if (id % 7 === 0) size = 'wide';
+
+    return {
+      id,
+      name: projectNames[i % projectNames.length] + (id > 10 ? ` Ph. ${Math.ceil(id/10)}` : ''),
+      developer: developers[i % developers.length],
+      location: loc,
+      yield: yieldVal + '%',
+      growth: (Math.random() * 5 + 6).toFixed(1) + '%',
+      price: (Math.random() * 8 + 1.5).toFixed(1) + 'M',
+      minsDT: Math.floor(Math.random() * 20 + 5),
+      minsMarina: Math.floor(Math.random() * 15 + 10),
+      size,
+      schools: "GEMS / Dubai British",
+      hospitals: "King's / Mediclinic",
+      malls: "Dubai Hills Mall / Dubai Mall"
+    };
+  });
+};
+
+// --- PROJECT CARD ---
+const ProjectCard = ({ project, onSelect, isActive }) => {
+  const spanClasses = {
+    sm: 'col-span-1 row-span-1',
+    wide: 'col-span-2 row-span-1',
+    lg: 'col-span-2 row-span-2',
+  }[project.size];
+
+  return (
+    <div className={`${spanClasses} group transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]`}>
+      <div 
+        onClick={() => onSelect(project)}
+        className={`relative h-full w-full rounded-[2.5rem] backdrop-blur-3xl border transition-all cursor-pointer p-6 flex flex-col justify-between
+          ${isActive 
+            ? 'bg-white/80 border-black/20 shadow-2xl ring-2 ring-black/5' 
+            : 'bg-white/40 border-white/60 shadow-lg hover:bg-white/60 active:scale-95'}`}
+      >
+        <div className="space-y-3">
+          <div className="flex justify-between items-start">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{project.developer}</p>
+              <h4 className={`${project.size === 'lg' ? 'text-2xl' : 'text-[17px]'} font-bold text-black leading-tight tracking-tighter`}>
+                {project.name}
+              </h4>
+            </div>
+            <ArrowUpRight size={14} className={`${isActive ? 'text-black' : 'text-gray-300'} group-hover:text-black transition-colors`} />
+          </div>
+        </div>
+
+        <div className="flex justify-between items-end border-t border-black/5 pt-4 mt-6">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-gray-400">
+              <MapPin size={10} />
+              <p className="text-[11px] font-medium tracking-tight">{project.location}</p>
+            </div>
+            <p className="text-[12px] font-bold tracking-tight text-black">
+              {project.yield} Yield • AED {project.price}
+            </p>
+          </div>
+          {project.size === 'sm' && <ChevronRight size={14} className="text-gray-400" />}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [data, setData] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('home');
+  const [assistantActive, setAssistantActive] = useState(false);
+  const [ripples, setRipples] = useState([]);
+  const [chatMessages, setChatMessages] = useState([
+    { id: 1, text: "Espacios Intelligence Core active. How can I assist?", sender: 'ai' }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+
+  const searchInputRef = useRef(null);
+  const assistantContainerRef = useRef(null);
+
+  useEffect(() => {
+    signInAnonymously(auth);
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setData(fetchMasterData());
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Handle clicking outside the chat bubble to close it
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (assistantContainerRef.current && !assistantContainerRef.current.contains(event.target)) {
+        setAssistantActive(false);
+      }
+    };
+    if (assistantActive) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [assistantActive]);
+
+  const handleRipple = (e) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setRipples(prev => [...prev, { x, y, id: Date.now() }]);
+    setTimeout(() => setRipples(prev => prev.slice(1)), 800);
+    
+    setAssistantActive(!assistantActive);
+    if (!assistantActive) {
+      setTimeout(() => searchInputRef.current?.focus(), 200);
+    }
+  };
+
+  const handleChatSend = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    const newMsg = { id: Date.now(), text: chatInput, sender: 'user' };
+    setChatMessages([...chatMessages, newMsg]);
+    setChatInput('');
+    
+    setTimeout(() => {
+      setChatMessages(prev => [...prev, { 
+        id: Date.now() + 1, 
+        text: `Processing query for "${chatInput}"... Analyzing 547 registries for optimization.`, 
+        sender: 'ai' 
+      }]);
+    }, 800);
+  };
+
+  const onProjectClick = (proj) => {
+    setSelectedProject(proj);
+    // Optional: Open assistant automatically on click?
+    // setAssistantActive(true);
+  };
+
+  const resetAll = () => {
+    setSelectedProject(null);
+    setActiveTab('home');
+    setAssistantActive(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  if (!user) return null;
+
+  return (
+    <div className={`min-h-screen font-sans selection:bg-gray-200 transition-colors duration-700 ${isDarkMode ? 'bg-[#1c1c1e] text-white' : 'bg-[#f2f2f7] text-black'}`}>
+      
+      {/* FLOATING CRYSTAL BANNER (Top Navigation) */}
+      <header className="fixed top-6 left-6 right-6 z-50">
+        <div className={`max-w-7xl mx-auto px-8 py-4 rounded-[2rem] border backdrop-blur-2xl flex justify-between items-center shadow-xl transition-all ${isDarkMode ? 'bg-[#1c1c1e]/60 border-white/10' : 'bg-white/60 border-white/40'}`}>
+          <h1 className="text-2xl font-bold tracking-tighter leading-none">Espacios</h1>
+          <button className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white/40 border-black/5 shadow-sm'}`}>
+            <User size={20} className={isDarkMode ? 'text-gray-300' : 'text-gray-600'} />
+          </button>
+        </div>
+      </header>
+
+      {/* iOS BOTTOM TAB BAR - INTEGRATED 3D SPHERE */}
+      <nav className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] backdrop-blur-2xl border px-8 py-3.5 rounded-full shadow-2xl flex items-center justify-between gap-10 transition-all min-w-[340px] ${isDarkMode ? 'bg-white/10 border-white/20' : 'bg-white/70 border-gray-200/50'}`}>
+         
+         <button onClick={resetAll} className="p-2 transition-transform active:scale-90">
+            <Home size={22} className={activeTab === 'home' && !assistantActive ? (isDarkMode ? 'text-white' : 'text-black') : 'text-gray-400'} />
+         </button>
+         
+         <button onClick={() => { setActiveTab('stats'); setAssistantActive(false); }} className="p-2 transition-transform active:scale-90">
+            <BarChart3 size={22} className={activeTab === 'stats' && !assistantActive ? (isDarkMode ? 'text-white' : 'text-black') : 'text-gray-400'} />
+         </button>
+
+         {/* THE WHITE 3D CORE SPHERE & OVAL CHAT BUBBLE */}
+         <div className="relative" ref={assistantContainerRef}>
+            
+            {/* OVAL CRYSTAL CHAT BUBBLE */}
+            {assistantActive && (
+              <div className={`absolute bottom-24 left-1/2 -translate-x-1/2 w-[320px] h-[400px] rounded-[3rem] border shadow-[0_20px_50px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden animate-in zoom-in-90 fade-in duration-500 backdrop-blur-3xl origin-bottom
+                ${isDarkMode ? 'bg-[#1c1c1e]/80 border-white/10' : 'bg-white/80 border-white/60'}`}>
+                
+                <div className="p-6 flex items-center justify-between border-b border-black/5">
+                   <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 bg-black rounded-full flex items-center justify-center"><Search size={12} className="text-white" /></div>
+                      <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Core Intelligence</span>
+                   </div>
+                   <button onClick={() => setAssistantActive(false)} className="p-2 hover:bg-black/5 rounded-full transition-all"><X size={18} className="text-gray-400" /></button>
+                </div>
+
+                <div className="flex-grow overflow-y-auto p-5 space-y-4 scrollbar-hide">
+                   {chatMessages.map(m => (
+                     <div key={m.id} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] px-4 py-2.5 rounded-[20px] text-[14px] font-medium leading-snug shadow-sm 
+                          ${m.sender === 'user' ? 'bg-black text-white' : 'bg-gray-100/80 text-gray-800'}`}>
+                           {m.text}
+                        </div>
+                     </div>
+                   ))}
+                </div>
+
+                <form onSubmit={handleChatSend} className="p-5 bg-transparent border-t border-black/5">
+                   <div className="relative flex items-center bg-gray-100/50 rounded-full p-1 border border-black/5">
+                      <input 
+                        ref={searchInputRef}
+                        type="text" 
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        placeholder="Message core..." 
+                        className="bg-transparent border-none outline-none w-full px-4 text-[14px] font-semibold text-black placeholder:text-gray-400" 
+                      />
+                      <button type="submit" className="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white active:scale-90 transition-transform">
+                         <Send size={14} />
+                      </button>
+                   </div>
+                </form>
+              </div>
+            )}
+
+            {/* THE 3D SPHERE */}
+            <button 
+               onClick={handleRipple}
+               className={`w-14 h-14 rounded-full transition-all active:scale-95 relative overflow-hidden shadow-xl
+                 ${assistantActive ? 'scale-110' : ''}
+                 bg-gradient-to-br from-white via-gray-100 to-gray-300 border border-white shadow-[inset_-2px_-2px_8px_rgba(0,0,0,0.1),0_8px_20px_rgba(0,0,0,0.15)]`}
+            >
+               {/* 3D Highlight Shine */}
+               <div className="absolute top-1.5 left-1.5 w-6 h-6 bg-white/50 blur-[5px] rounded-full" />
+               
+               {ripples.map(r => (
+                  <span key={r.id} className="absolute bg-black/5 rounded-full animate-ping pointer-events-none" 
+                        style={{ left: r.x-20, top: r.y-20, width: 40, height: 40 }} />
+               ))}
+            </button>
+         </div>
+
+         <button onClick={() => { setActiveTab('activity'); setAssistantActive(false); }} className="p-2 transition-transform active:scale-90">
+            <Activity size={22} className={activeTab === 'activity' && !assistantActive ? (isDarkMode ? 'text-white' : 'text-black') : 'text-gray-400'} />
+         </button>
+         
+         <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 transition-transform active:scale-90">
+            <Circle size={22} className={isDarkMode ? 'text-white fill-white/20' : 'text-gray-400'} />
+         </button>
+      </nav>
+
+      {/* MAIN REGISTRY GRID */}
+      <main className="max-w-7xl mx-auto px-6 pt-32 pb-48">
+        {activeTab === 'stats' ? (
+          <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className={`p-10 rounded-[3rem] border backdrop-blur-3xl shadow-sm ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white/60 border-white/40'}`}>
+                <PieChart className="text-gray-400 mb-4" />
+                <h3 className="text-2xl font-bold tracking-tight text-gray-600">Active Portfolio</h3>
+                <p className="text-6xl font-black mt-4 tracking-tighter text-black">547</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">Projects Logged</p>
+             </div>
+             <div className={`p-10 rounded-[3rem] border backdrop-blur-3xl shadow-sm ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white/60 border-white/40'}`}>
+                <TrendingUp className="text-gray-400 mb-4" />
+                <h3 className="text-2xl font-bold tracking-tight text-gray-600">Yield Average</h3>
+                <p className="text-6xl font-black mt-4 text-black tracking-tighter">6.4%</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">Aggregated Return</p>
+             </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 grid-flow-dense animate-in fade-in slide-in-from-bottom-4 duration-1000">
+            {data.map(p => (
+              <ProjectCard 
+                key={p.id} 
+                project={p} 
+                onSelect={onProjectClick}
+                isActive={selectedProject?.id === p.id}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* IN-GRID EXPANDED DATA (Hidden, we use Sidebar or Oval in current model) */}
+        {selectedProject && activeTab === 'home' && (
+          <div className="mt-12 p-10 bg-white/80 backdrop-blur-3xl rounded-[3rem] border border-white shadow-2xl animate-in zoom-in-95 duration-500">
+             <div className="flex justify-between items-start mb-8">
+                <div>
+                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{selectedProject.developer}</p>
+                   <h2 className="text-4xl font-bold tracking-tighter">{selectedProject.name}</h2>
+                </div>
+                <button onClick={() => setSelectedProject(null)} className="p-3 bg-gray-100 rounded-full"><X size={20} className="text-gray-500" /></button>
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="bg-gray-50 p-6 rounded-3xl">
+                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Target Yield</p>
+                   <p className="text-3xl font-bold">{selectedProject.yield}</p>
+                </div>
+                <div className="bg-gray-50 p-6 rounded-3xl">
+                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Mins to Downtown</p>
+                   <p className="text-3xl font-bold">{selectedProject.minsDT}m</p>
+                </div>
+                <button className="bg-black text-white rounded-3xl font-bold px-8 active:scale-95 transition-transform flex items-center justify-center gap-2">
+                   <Download size={20} /> Export Factsheet
+                </button>
+             </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+```
