@@ -1,359 +1,949 @@
-```react
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  Search, 
-  ArrowLeft, 
-  X, 
-  Send, 
-  MapPin, 
-  Building2, 
-  School, 
-  Hospital, 
-  ShoppingBag,
-  Clock,
-  ChevronRight,
-  BarChart3,
-  Home,
-  User,
-  MoreHorizontal,
-  ArrowUpRight,
-  Circle,
-  Activity,
-  PieChart,
-  MessageCircle,
-  Download
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import {
+  MapPin, MessageCircle, TrendingUp, GraduationCap,
+  X, Heart, Move, ShoppingBag, Trees, Cross,
+  SlidersHorizontal, Bookmark,
 } from 'lucide-react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  onAuthStateChanged, 
-  signInAnonymously, 
-  signOut 
-} from 'firebase/auth';
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+} from 'recharts';
 
-// --- INITIALIZATION ---
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+/* ─── DATA ─────────────────────────────────────────────────────────────── */
+const PHONE = '971559424193';
+const AGENT = 'Nareen Alharbi';
+const waLink = (title, action = "share full details") =>
+  `https://wa.me/${PHONE}?text=${encodeURIComponent(`Hi Nareen, I'm interested in ${title}. I would like to ${action}.`)}`;
 
-// --- DATA ENGINE (Espacios 547 Registry) ---
-const fetchMasterData = () => {
-  const projectNames = [
-    "Grand Polo Club", "Equiterra", "Palm Beach Towers", "The Heights", "Dubai Mansions", 
-    "Rixos Residences", "District One Naya", "The Acres", "Asora Bay", "Atélis at d3"
-  ];
-  const developers = ['Emaar', 'Nakheel', 'Meraas', 'Damac', 'Sobha', 'Ellington'];
-  const locations = ['Dubai Hills', 'Palm Jumeirah', 'Dubai South', 'Downtown', 'DIP', 'Expo City'];
-  
-  return Array.from({ length: 547 }).map((_, i) => {
-    const id = i + 1;
-    const loc = locations[i % locations.length];
-    const yieldVal = (Math.random() * 4 + 4.5).toFixed(1);
-    
-    let size = 'sm';
-    if (id % 15 === 0) size = 'lg'; 
-    else if (id % 7 === 0) size = 'wide';
+const projects = [
+  {
+    id: 202, title: 'Cavalli Tower', developer: 'DAMAC Properties',
+    location: 'Dubai Marina', type: 'Branded Apts (Cavalli)',
+    handover: 'Ready', price: 'AED 18M', paymentPlan: '80/20',
+    size: 'Multiple Layouts', bedrooms: '2–5 BR', bathrooms: 'Varies',
+    heroImage: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1600&q=80',
+    paymentSchedule: [
+      { label: 'Booking', value: '20%' }, { label: 'During Construction', value: '60%' }, { label: 'On Handover', value: '20%' },
+    ],
+    investorSnap: [
+      'Projected Annual Yield: 4.5% – 5.0%',
+      'Expected Capital Appreciation: 8% – 12%',
+      'Total Return Forecast: 12.5% – 17.0%',
+      'Market Condition: Prime resilient. Market remains active but increasingly differentiated by developer, micro-location, and livability.',
+    ],
+    areaSnapshot: {
+      schools: ['American Univ. Dubai'],
+      hospitals: ['Saudi German Hospital'],
+      malls: ['Dubai Marina Mall'],
+      recreation: ['Sheikh Zayed E11', 'Marina Walk'],
+      commute: { dt: '20 mins', marina: '5 mins', dxb: '25 mins', dwc: '30 mins' }
+    },
+    gallery: {
+      exteriors: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1600&q=80'],
+      interiors: ['https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1600&q=80'],
+      community: ['https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80'],
+    },
+  },
+  {
+    id: 1, title: 'Mirage at The Oasis', developer: 'Emaar Properties',
+    location: 'The Oasis, Dubailand', type: '5–6 BR Villas & Mansions',
+    handover: 'Q2 2028', price: 'AED 15.8M', paymentPlan: '90/10',
+    size: '10,225 – 12,967 sq.ft', bedrooms: '5–6 BR', bathrooms: '7+ Bath',
+    heroImage: 'https://cdn.opr.ae/photo/Oasis_Mirage.jpg',
+    paymentSchedule: [
+      { label: 'Booking', value: '10%' }, { label: 'During Construction', value: '80%' }, { label: 'On Handover', value: '10%' },
+    ],
+    investorSnap: [
+      'Mirage 5BR is positioned below wider Oasis 5BR median, supporting a value-entry sales angle.',
+      'Low-density ultra-luxury villa stock gives stronger long-term resale storytelling than mass-market family communities.',
+      'Lagoon-led masterplan and Emaar delivery help frame this as scarcity-driven end-user and investor stock.',
+    ],
+    areaSnapshot: {
+      schools: ['Schools planned inside The Oasis', 'Chubby Cheeks Nursery', 'South View School', 'The International School of Choueifat'],
+      hospitals: ['NMC Specialty Hospital', 'NMC Royal Hospital', 'Aster Clinic DIP'],
+      malls: ['Circle Mall', 'City Centre Me\'aisem', 'Town Square Community Center', 'The Ranches Souk'],
+      recreation: ['Trump International Golf Club', 'Jumeirah Golf Estates', 'The Els Club', 'Hamdan Sports Complex'],
+    },
+    gallery: {
+      exteriors: ['https://cdn.opr.ae/photo/Oasis_Mirage.jpg', 'https://i.1.creatium.io/disk2/1b/e9/3c/f15c840c3ff67cd53e6750dd182ebe9e64/mob_header.jpg'],
+      interiors: ['https://i.1.creatium.io/disk2/1b/e9/3c/f15c840c3ff67cd53e6750dd182ebe9e64/mob_header.jpg'],
+      community: ['https://cdn.opr.ae/photo/Oasis_Mirage.jpg'],
+    },
+  },
+  {
+    id: 2, title: 'Address The Bay', developer: 'Emaar Properties',
+    location: 'Emaar Beachfront, Dubai Harbour', type: '1–3 BR Branded Apartments',
+    handover: 'Q4 2026', price: 'AED 3.323M', paymentPlan: '80/20',
+    size: '803 – 1,970 sq.ft', bedrooms: '1–3 BR', bathrooms: '2–4 Bath',
+    heroImage: 'https://i.1.creatium.io/fc/a1/94/1fb95fdb5719498c9a4675c6fa615f78a5/1header.jpg',
+    paymentSchedule: [
+      { label: 'Booking', value: '10%' }, { label: 'During Construction', value: '70%' }, { label: 'On Handover', value: '20%' },
+    ],
+    investorSnap: [
+      'Premium branded waterfront positioning supports a stronger resale narrative than generic apartment stock.',
+      'Recent Emaar Beachfront transaction medians show deep pricing demand in 1BR and 2BR categories.',
+      'Works best as a capital-growth and branded-rental story rather than a bargain buy.',
+    ],
+    areaSnapshot: {
+      schools: ['Blossom Palm Jumeirah Nursery', 'Jumeirah International Nurseries', 'Raffles Nursery Dubai Marina', 'International School of Choueifat'],
+      hospitals: ['Al Zahra Hospital Dubai', 'Saudi German Hospital Dubai', 'Marina Medical Center'],
+      malls: ['Dubai Marina Mall', 'Nakheel Mall', 'Mall of the Emirates'],
+      recreation: ['Private beach access', 'Dubai Marina', 'Skydive Dubai', 'Palm Jumeirah boardwalk'],
+    },
+    gallery: {
+      exteriors: ['https://i.1.creatium.io/fc/a1/94/1fb95fdb5719498c9a4675c6fa615f78a5/1header.jpg', 'https://cdn.opr.ae/icons/Beach-Mansion-at-Emaar-Beachfront.jpg'],
+      interiors: ['https://cdn.opr.ae/icons/shorefront-residences/Emaar-Beachfront.jpg'],
+      community: ['https://cdn.opr.ae/icons/Beach-Mansion-at-Emaar-Beachfront.jpg'],
+    },
+  },
+  {
+    id: 3, title: 'Elie Saab Villas', developer: 'Emaar Properties',
+    location: 'Dubai Hills Estate', type: 'Designer Villas',
+    handover: 'Ready / By Phase', price: 'AED 18M', paymentPlan: '60/40',
+    size: '5,500 – 6,500 sq.ft', bedrooms: '5 BR', bathrooms: '6+ Bath',
+    heroImage: 'https://437e81e1-5ed1-4d53-bed7-e6f8d97dcc9b.selcdn.net/47/ee/72/cb69ebbb564321739cc2076f27eaef2b93/1161x832q8/Header.jpg',
+    paymentSchedule: [
+      { label: 'Booking', value: '10%' }, { label: 'During Construction', value: '50%' }, { label: 'On Handover', value: '40%' },
+    ],
+    investorSnap: [
+      'Dubai Hills gives the cleanest premium-villa comparison set, making investor justification much easier.',
+      'Design-led product inside one of Dubai\'s most proven family districts.',
+      'Use the Dubai Hills pricing ladder to show where Elie Saab sits between market confidence and top-tier cluster scarcity.',
+    ],
+    areaSnapshot: {
+      schools: ['GEMS International School', 'GEMS Wellington Academy', 'GEMS New Millennium School'],
+      hospitals: ['King\'s College Hospital'],
+      malls: ['Dubai Hills Mall'],
+      recreation: ['Dubai Hills Park', 'Dubai Hills Golf Club', 'Open green spaces and play areas'],
+    },
+    gallery: {
+      exteriors: ['https://437e81e1-5ed1-4d53-bed7-e6f8d97dcc9b.selcdn.net/47/ee/72/cb69ebbb564321739cc2076f27eaef2b93/1161x832q8/Header.jpg', 'https://i.1.creatium.io/e7/5b/11/ed18eec8930a4fcd095e249c6e08e1bb69/golf-place.jpg'],
+      interiors: ['https://i.1.creatium.io/17/b7/bc/b0acf2c391b4b4c851ec03c92920937d58/golf-place-30.jpg'],
+      community: ['https://i.1.creatium.io/e7/5b/11/ed18eec8930a4fcd095e249c6e08e1bb69/golf-place.jpg'],
+    },
+  },
+  {
+    id: 4, title: 'Bayn by ORA', developer: 'ORA Developers',
+    location: 'Ghantoot', type: 'Townhouses & Villas',
+    handover: 'Announced / By Unit Type', price: 'From AED 2.75M', paymentPlan: 'Flexible',
+    size: 'Multiple layouts', bedrooms: '3–5 BR', bathrooms: 'Varies',
+    heroImage: 'https://metropolitan.realestate/wp-content/uploads/2025/04/Bayn-by-Ora-1-1024x585.webp',
+    paymentSchedule: [
+      { label: 'Booking', value: '20%' }, { label: 'Flexible Installments', value: '60%' }, { label: 'Final Payment', value: '20%' },
+    ],
+    investorSnap: [
+      'First-mover coastal masterplan play rather than a mature transaction-data story.',
+      'Use lifestyle, scale, and between-two-cities positioning as the primary investor hook.',
+      'Best for buyers who want early entry into a large waterfront destination with future upside.',
+    ],
+    areaSnapshot: {
+      schools: ['Schools and education services planned within the master community'],
+      hospitals: ['Healthcare services planned within the master community'],
+      malls: ['Retail and dining zones within the development'],
+      recreation: ['Private beach', 'Marina and lagoon promenades', 'Parks and green trails', 'Sports club'],
+    },
+    gallery: {
+      exteriors: ['https://metropolitan.realestate/wp-content/uploads/2025/04/Bayn-by-Ora-1-1024x585.webp'],
+      interiors: ['https://metropolitan.realestate/wp-content/uploads/2025/04/Bayn-by-Ora-4-1024x585.webp'],
+      community: ['https://metropolitan.realestate/wp-content/uploads/2025/04/Bayn-by-Ora-2-1024x585.webp'],
+    },
+  },
+  {
+    id: 5, title: 'Bulgari Lighthouse', developer: 'Meraas',
+    location: 'Jumeirah Bay Island', type: 'Ultra-Luxury Residences',
+    handover: 'Q4 2027', price: 'From AED 63M', paymentPlan: '60/40',
+    size: '6,900 – 13,000 sq.ft', bedrooms: '4–5 BR', bathrooms: '6+ Bath',
+    heroImage: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1600&q=80',
+    paymentSchedule: [
+      { label: 'Booking', value: '10%' }, { label: 'During Construction', value: '50%' }, { label: 'On Handover', value: '40%' },
+    ],
+    investorSnap: [
+      'Bulgari-branded inventory sits in one of Dubai\'s most tightly held ultra-prime waterfront pockets.',
+      'Jumeirah Bay Island supports a scarcity narrative that appeals to trophy-asset buyers.',
+      'Best presented as a long-term wealth preservation and prestige acquisition story.',
+    ],
+    areaSnapshot: {
+      schools: ['Jumeirah English Speaking School', 'Horizon English School', 'GEMS Wellington Primary School'],
+      hospitals: ['Medcare Hospital Jumeirah', 'Emirates Hospital Jumeirah', 'American Hospital Dubai'],
+      malls: ['City Walk', 'Dubai Mall', 'Mercato Shopping Mall'],
+      recreation: ['Bulgari Marina', 'Nikki Beach', 'Dubai Canal', 'Jumeirah Beach coastline'],
+    },
+    gallery: {
+      exteriors: ['https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1600&q=80', 'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1600&q=80'],
+      interiors: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1600&q=80'],
+      community: ['https://images.unsplash.com/photo-1449844908441-8829872d2607?auto=format&fit=crop&w=1600&q=80'],
+    },
+  },
+  {
+    id: 6, title: 'Como Residences', developer: 'Nakheel',
+    location: 'Palm Jumeirah', type: 'Sky Mansions & Luxury Apartments',
+    handover: 'Q3 2027', price: 'From AED 21M', paymentPlan: '80/20',
+    size: '4,469 – 21,949 sq.ft', bedrooms: '2–7 BR', bathrooms: '3–8 Bath',
+    heroImage: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1600&q=80',
+    paymentSchedule: [
+      { label: 'Booking', value: '20%' }, { label: 'During Construction', value: '60%' }, { label: 'On Handover', value: '20%' },
+    ],
+    investorSnap: [
+      'Palm Jumeirah remains one of the most globally recognizable branded lifestyle addresses in Dubai.',
+      'Large-format sky residences create a differentiated proposition compared with standard luxury towers.',
+      'The strongest pitch is exclusivity, private amenity access, and landmark architecture.',
+    ],
+    areaSnapshot: {
+      schools: ['Asya\'s Nursery', 'Redwood Montessori Nursery', 'Dubai College'],
+      hospitals: ['Al Das Medical Clinic', 'Emirates Hospital Clinics Palm Jumeirah', 'Saudi German Hospital Dubai'],
+      malls: ['Nakheel Mall', 'Golden Mile Galleria', 'Mall of the Emirates'],
+      recreation: ['Palm West Beach', 'The Pointe district', 'Atlantis resorts', 'Beach clubs and yacht access'],
+    },
+    gallery: {
+      exteriors: ['https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1600&q=80'],
+      interiors: ['https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1600&q=80'],
+      community: ['https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80'],
+    },
+  },
+  {
+    id: 7, title: 'Six Senses Residences', developer: 'Select Group',
+    location: 'Palm Jumeirah, West Crescent', type: 'Branded Wellness Residences',
+    handover: 'Q4 2027', price: 'From AED 9.4M', paymentPlan: '40/60',
+    size: '1,980 – 26,500 sq.ft', bedrooms: '2–5 BR', bathrooms: '3–7 Bath',
+    heroImage: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80',
+    paymentSchedule: [
+      { label: 'Booking', value: '10%' }, { label: 'During Construction', value: '30%' }, { label: 'On Handover', value: '60%' },
+    ],
+    investorSnap: [
+      'The wellness-branded angle gives this project a different emotional positioning from conventional branded stock.',
+      'Palm inventory with strong hospitality alignment supports both resale appeal and premium lifestyle messaging.',
+      'Best presented as a rare-use asset for buyers who care about wellness, service, and waterfront privacy.',
+    ],
+    areaSnapshot: {
+      schools: ['Blossom Palm Jumeirah Nursery', 'Redwood Montessori Nursery', 'GEMS Wellington International School'],
+      hospitals: ['Emirates Hospital Clinics Palm Jumeirah', 'Al Zahra Hospital Dubai', 'King\'s Marina Medical Center'],
+      malls: ['Nakheel Mall', 'Golden Mile Galleria', 'Dubai Marina Mall'],
+      recreation: ['Private beach', 'Palm Boardwalk', 'Beach clubs', 'Yacht marina access'],
+    },
+    gallery: {
+      exteriors: ['https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80'],
+      interiors: ['https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1600&q=80'],
+      community: ['https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80'],
+    },
+  },
+  {
+    id: 8, title: 'Mercedes-Benz Places', developer: 'Binghatti',
+    location: 'Downtown Dubai', type: 'Branded Residences',
+    handover: 'Q4 2026', price: 'From AED 8.8M', paymentPlan: '70/30',
+    size: '1,837 – 18,105 sq.ft', bedrooms: '2–7 BR', bathrooms: '3–8 Bath',
+    heroImage: 'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1600&q=80',
+    paymentSchedule: [
+      { label: 'Booking', value: '20%' }, { label: 'During Construction', value: '50%' }, { label: 'On Handover', value: '30%' },
+    ],
+    investorSnap: [
+      'Downtown branded stock benefits from global name recognition and immediate landmark adjacency.',
+      'Positioned as a statement residence with stronger branding power than generic luxury towers.',
+      'Ideal for clients seeking centrality, skyline views, and iconic-city-address appeal.',
+    ],
+    areaSnapshot: {
+      schools: ['JSS Private School', 'Horizon English School', 'GEMS Wellington Primary School'],
+      hospitals: ['Medcare Hospital Al Safa', 'Emirates Hospital Jumeirah', 'American Hospital Dubai'],
+      malls: ['Dubai Mall', 'City Walk', 'Bay Avenue'],
+      recreation: ['Burj Khalifa district', 'Dubai Opera', 'Dubai Canal', 'Fine dining and luxury retail'],
+    },
+    gallery: {
+      exteriors: ['https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1600&q=80'],
+      interiors: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1600&q=80'],
+      community: ['https://images.unsplash.com/photo-1449844908441-8829872d2607?auto=format&fit=crop&w=1600&q=80'],
+    },
+  },
+  {
+    id: 9, title: 'The Rings', developer: 'PMR Property',
+    location: 'Jumeirah Second, Dubai Water Canal', type: 'Ultra-Bespoke Mansions in the Sky',
+    handover: 'Q4 2027', price: 'From AED 59M', paymentPlan: '60/40',
+    size: '9,500 – 19,800 sq.ft', bedrooms: '5–7 BR', bathrooms: '7+ Bath',
+    heroImage: 'https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=1600&q=80',
+    paymentSchedule: [
+      { label: 'Booking', value: '10%' }, { label: 'During Construction', value: '50%' }, { label: 'On Handover', value: '40%' },
+    ],
+    investorSnap: [
+      'Extremely limited inventory gives this project one of the strongest scarcity stories in the ultra-prime segment.',
+      'Canal-front positioning and oversized layouts appeal to buyers graduating from villas into vertical trophy assets.',
+      'The sales angle here is rarity, design identity, and ultra-low competition.',
+    ],
+    areaSnapshot: {
+      schools: ['Jumeirah College', 'Horizon English School', 'JSS Private School'],
+      hospitals: ['Medcare Women & Children Hospital', 'Iranian Hospital', 'Emirates Hospital'],
+      malls: ['City Walk', 'Dubai Mall', 'Boxpark'],
+      recreation: ['Dubai Water Canal promenade', 'Jumeirah Beach access', 'Fine dining clusters', 'Private fitness and spa'],
+    },
+    gallery: {
+      exteriors: ['https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=1600&q=80'],
+      interiors: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1600&q=80'],
+      community: ['https://images.unsplash.com/photo-1449844908441-8829872d2607?auto=format&fit=crop&w=1600&q=80'],
+    },
+  },
+];
 
-    return {
-      id,
-      name: projectNames[i % projectNames.length] + (id > 10 ? ` Ph. ${Math.ceil(id/10)}` : ''),
-      developer: developers[i % developers.length],
-      location: loc,
-      yield: yieldVal + '%',
-      growth: (Math.random() * 5 + 6).toFixed(1) + '%',
-      price: (Math.random() * 8 + 1.5).toFixed(1) + 'M',
-      minsDT: Math.floor(Math.random() * 20 + 5),
-      minsMarina: Math.floor(Math.random() * 15 + 10),
-      size,
-      schools: "GEMS / Dubai British",
-      hospitals: "King's / Mediclinic",
-      malls: "Dubai Hills Mall / Dubai Mall"
-    };
-  });
+const benchmarks = {
+  1: { subtitle: 'Transaction medians · The Oasis', data: [{ name: 'Mirage 5BR', psf: 1610, price: 17.8 }, { name: 'Oasis 5BR', psf: 1790, price: 19.3 }, { name: 'Ostra 5BR', psf: 1830, price: 19.8 }, { name: 'Tierra 5BR', psf: 1750, price: 19.0 }] },
+  2: { subtitle: 'Transaction medians · Emaar Beachfront', data: [{ name: 'Address 1BR', psf: 3680, price: 3.1 }, { name: 'BF 1BR', psf: 3420, price: 2.7 }, { name: 'Address 2BR', psf: 3740, price: 5.0 }, { name: 'BF 2BR', psf: 3860, price: 5.1 }] },
+  3: { subtitle: 'Transaction medians · Dubai Hills', data: [{ name: 'Dubai Hills 5BR', psf: 2430, price: 15.9 }, { name: 'Park Gate 5BR', psf: 2370, price: 15.0 }, { name: 'Palm Hills 5BR', psf: 2550, price: 19.0 }, { name: 'Golf Place 5BR', psf: 2810, price: 22.9 }] },
+  5: { subtitle: 'Ultra-luxury positioning · Jumeirah Bay', data: [{ name: 'Bulgari Res.', psf: 9500, price: 63 }, { name: 'Jumeirah Bay', psf: 8700, price: 56 }, { name: 'Canal Cove', psf: 6900, price: 42 }, { name: 'Prime Waterfront', psf: 8100, price: 51 }] },
+  6: { subtitle: 'Palm Jumeirah tower comps', data: [{ name: 'Como 3BR', psf: 5400, price: 24 }, { name: 'Palm Prime', psf: 4900, price: 20 }, { name: 'Branded Palm', psf: 5700, price: 28 }, { name: 'Ultra Tower', psf: 6100, price: 31 }] },
+  7: { subtitle: 'Wellness-branded waterfront comps', data: [{ name: 'Six Senses 2BR', psf: 4600, price: 9.4 }, { name: 'Palm 2BR', psf: 3900, price: 7.8 }, { name: 'Branded 3BR', psf: 5100, price: 15.2 }, { name: 'Prime Wellness', psf: 5300, price: 16.5 }] },
+  8: { subtitle: 'Downtown branded high-rise comps', data: [{ name: 'MB Places 2BR', psf: 4200, price: 8.8 }, { name: 'Downtown Prime', psf: 3600, price: 7.2 }, { name: 'Branded Tower', psf: 4100, price: 8.1 }, { name: 'Opera Dist.', psf: 3900, price: 7.6 }] },
+  9: { subtitle: 'Canal-front ultra-prime comps', data: [{ name: 'The Rings', psf: 6200, price: 59 }, { name: 'Canal Ultra', psf: 5700, price: 47 }, { name: 'Waterfront Sky', psf: 5400, price: 44 }, { name: 'Jumeirah Prime', psf: 5900, price: 52 }] },
 };
 
-// --- PROJECT CARD ---
-const ProjectCard = ({ project, onSelect, isActive }) => {
-  const spanClasses = {
-    sm: 'col-span-1 row-span-1',
-    wide: 'col-span-2 row-span-1',
-    lg: 'col-span-2 row-span-2',
-  }[project.size];
+/* ─── HELPERS ─────────────────────────────────────────────────────────── */
+const toNum = (s) => parseFloat((s || '').replace(/[^0-9.]/g, '')) || 0;
 
-  return (
-    <div className={`${spanClasses} group transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]`}>
-      <div 
-        onClick={() => onSelect(project)}
-        className={`relative h-full w-full rounded-[2.5rem] backdrop-blur-3xl border transition-all cursor-pointer p-6 flex flex-col justify-between
-          ${isActive 
-            ? 'bg-white/80 border-black/20 shadow-2xl ring-2 ring-black/5' 
-            : 'bg-white/40 border-white/60 shadow-lg hover:bg-white/60 active:scale-95'}`}
-      >
-        <div className="space-y-3">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{project.developer}</p>
-              <h4 className={`${project.size === 'lg' ? 'text-2xl' : 'text-[17px]'} font-bold text-black leading-tight tracking-tighter`}>
-                {project.name}
-              </h4>
-            </div>
-            <ArrowUpRight size={14} className={`${isActive ? 'text-black' : 'text-gray-300'} group-hover:text-black transition-colors`} />
-          </div>
-        </div>
-
-        <div className="flex justify-between items-end border-t border-black/5 pt-4 mt-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-gray-400">
-              <MapPin size={10} />
-              <p className="text-[11px] font-medium tracking-tight">{project.location}</p>
-            </div>
-            <p className="text-[12px] font-bold tracking-tight text-black">
-              {project.yield} Yield • AED {project.price}
-            </p>
-          </div>
-          {project.size === 'sm' && <ChevronRight size={14} className="text-gray-400" />}
-        </div>
-      </div>
-    </div>
-  );
+const priceTag = (n) => {
+  if (n < 5) return { key: 'entry', label: '< AED 5M', hex: '#5eead4', hx2: '#22d3ee' };
+  if (n < 15) return { key: 'mid', label: 'AED 5–15M', hex: '#a78bfa', hx2: '#818cf8' };
+  if (n < 30) return { key: 'premium', label: 'AED 15–30M', hex: '#f0abfc', hx2: '#e879f9' };
+  return { key: 'ultra', label: 'AED 30M+', hex: '#fcd34d', hx2: '#fb923c' };
 };
 
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [data, setData] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [activeTab, setActiveTab] = useState('home');
-  const [assistantActive, setAssistantActive] = useState(false);
-  const [ripples, setRipples] = useState([]);
-  const [chatMessages, setChatMessages] = useState([
-    { id: 1, text: "Espacios Intelligence Core active. How can I assist?", sender: 'ai' }
-  ]);
-  const [chatInput, setChatInput] = useState('');
+const getSimilar = (p, n = 3) => {
+  const target = toNum(p.price);
+  const tag = priceTag(target).key;
+  let pool = projects.filter((x) => x.id !== p.id && priceTag(toNum(x.price)).key === tag);
+  if (pool.length < n) pool = projects.filter((x) => x.id !== p.id);
+  return pool.sort((a, b) => Math.abs(toNum(a.price) - target) - Math.abs(toNum(b.price) - target)).slice(0, n);
+};
 
-  const searchInputRef = useRef(null);
-  const assistantContainerRef = useRef(null);
+/* ─── CARD ASPECT RATIOS for masonry puzzle variety ──────────────────── */
+const ASPECT_RATIOS = ['1/1', '3/4', '4/5', '1/1', '2/3', '3/4', '1/1', '4/5'];
 
-  useEffect(() => {
-    signInAnonymously(auth);
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setData(fetchMasterData());
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Handle clicking outside the chat bubble to close it
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (assistantContainerRef.current && !assistantContainerRef.current.contains(event.target)) {
-        setAssistantActive(false);
-      }
-    };
-    if (assistantActive) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [assistantActive]);
-
-  const handleRipple = (e) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setRipples(prev => [...prev, { x, y, id: Date.now() }]);
-    setTimeout(() => setRipples(prev => prev.slice(1)), 800);
-    
-    setAssistantActive(!assistantActive);
-    if (!assistantActive) {
-      setTimeout(() => searchInputRef.current?.focus(), 200);
-    }
-  };
-
-  const handleChatSend = (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    const newMsg = { id: Date.now(), text: chatInput, sender: 'user' };
-    setChatMessages([...chatMessages, newMsg]);
-    setChatInput('');
-    
-    setTimeout(() => {
-      setChatMessages(prev => [...prev, { 
-        id: Date.now() + 1, 
-        text: `Processing query for "${chatInput}"... Analyzing 547 registries for optimization.`, 
-        sender: 'ai' 
-      }]);
-    }, 800);
-  };
-
-  const onProjectClick = (proj) => {
-    setSelectedProject(proj);
-    // Optional: Open assistant automatically on click?
-    // setAssistantActive(true);
-  };
-
-  const resetAll = () => {
-    setSelectedProject(null);
-    setActiveTab('home');
-    setAssistantActive(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  if (!user) return null;
-
+/* ─── ORBS ───────────────────────────────────────────────────────────── */
+function Orbs() {
   return (
-    <div className={`min-h-screen font-sans selection:bg-gray-200 transition-colors duration-700 ${isDarkMode ? 'bg-[#1c1c1e] text-white' : 'bg-[#f2f2f7] text-black'}`}>
-      
-      {/* FLOATING CRYSTAL BANNER (Top Navigation) */}
-      <header className="fixed top-6 left-6 right-6 z-50">
-        <div className={`max-w-7xl mx-auto px-8 py-4 rounded-[2rem] border backdrop-blur-2xl flex justify-between items-center shadow-xl transition-all ${isDarkMode ? 'bg-[#1c1c1e]/60 border-white/10' : 'bg-white/60 border-white/40'}`}>
-          <h1 className="text-2xl font-bold tracking-tighter leading-none">Espacios</h1>
-          <button className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white/40 border-black/5 shadow-sm'}`}>
-            <User size={20} className={isDarkMode ? 'text-gray-300' : 'text-gray-600'} />
-          </button>
-        </div>
-      </header>
-
-      {/* iOS BOTTOM TAB BAR - INTEGRATED 3D SPHERE */}
-      <nav className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] backdrop-blur-2xl border px-8 py-3.5 rounded-full shadow-2xl flex items-center justify-between gap-10 transition-all min-w-[340px] ${isDarkMode ? 'bg-white/10 border-white/20' : 'bg-white/70 border-gray-200/50'}`}>
-         
-         <button onClick={resetAll} className="p-2 transition-transform active:scale-90">
-            <Home size={22} className={activeTab === 'home' && !assistantActive ? (isDarkMode ? 'text-white' : 'text-black') : 'text-gray-400'} />
-         </button>
-         
-         <button onClick={() => { setActiveTab('stats'); setAssistantActive(false); }} className="p-2 transition-transform active:scale-90">
-            <BarChart3 size={22} className={activeTab === 'stats' && !assistantActive ? (isDarkMode ? 'text-white' : 'text-black') : 'text-gray-400'} />
-         </button>
-
-         {/* THE WHITE 3D CORE SPHERE & OVAL CHAT BUBBLE */}
-         <div className="relative" ref={assistantContainerRef}>
-            
-            {/* OVAL CRYSTAL CHAT BUBBLE */}
-            {assistantActive && (
-              <div className={`absolute bottom-24 left-1/2 -translate-x-1/2 w-[320px] h-[400px] rounded-[3rem] border shadow-[0_20px_50px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden animate-in zoom-in-90 fade-in duration-500 backdrop-blur-3xl origin-bottom
-                ${isDarkMode ? 'bg-[#1c1c1e]/80 border-white/10' : 'bg-white/80 border-white/60'}`}>
-                
-                <div className="p-6 flex items-center justify-between border-b border-black/5">
-                   <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 bg-black rounded-full flex items-center justify-center"><Search size={12} className="text-white" /></div>
-                      <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Core Intelligence</span>
-                   </div>
-                   <button onClick={() => setAssistantActive(false)} className="p-2 hover:bg-black/5 rounded-full transition-all"><X size={18} className="text-gray-400" /></button>
-                </div>
-
-                <div className="flex-grow overflow-y-auto p-5 space-y-4 scrollbar-hide">
-                   {chatMessages.map(m => (
-                     <div key={m.id} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] px-4 py-2.5 rounded-[20px] text-[14px] font-medium leading-snug shadow-sm 
-                          ${m.sender === 'user' ? 'bg-black text-white' : 'bg-gray-100/80 text-gray-800'}`}>
-                           {m.text}
-                        </div>
-                     </div>
-                   ))}
-                </div>
-
-                <form onSubmit={handleChatSend} className="p-5 bg-transparent border-t border-black/5">
-                   <div className="relative flex items-center bg-gray-100/50 rounded-full p-1 border border-black/5">
-                      <input 
-                        ref={searchInputRef}
-                        type="text" 
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        placeholder="Message core..." 
-                        className="bg-transparent border-none outline-none w-full px-4 text-[14px] font-semibold text-black placeholder:text-gray-400" 
-                      />
-                      <button type="submit" className="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white active:scale-90 transition-transform">
-                         <Send size={14} />
-                      </button>
-                   </div>
-                </form>
-              </div>
-            )}
-
-            {/* THE 3D SPHERE */}
-            <button 
-               onClick={handleRipple}
-               className={`w-14 h-14 rounded-full transition-all active:scale-95 relative overflow-hidden shadow-xl
-                 ${assistantActive ? 'scale-110' : ''}
-                 bg-gradient-to-br from-white via-gray-100 to-gray-300 border border-white shadow-[inset_-2px_-2px_8px_rgba(0,0,0,0.1),0_8px_20px_rgba(0,0,0,0.15)]`}
-            >
-               {/* 3D Highlight Shine */}
-               <div className="absolute top-1.5 left-1.5 w-6 h-6 bg-white/50 blur-[5px] rounded-full" />
-               
-               {ripples.map(r => (
-                  <span key={r.id} className="absolute bg-black/5 rounded-full animate-ping pointer-events-none" 
-                        style={{ left: r.x-20, top: r.y-20, width: 40, height: 40 }} />
-               ))}
-            </button>
-         </div>
-
-         <button onClick={() => { setActiveTab('activity'); setAssistantActive(false); }} className="p-2 transition-transform active:scale-90">
-            <Activity size={22} className={activeTab === 'activity' && !assistantActive ? (isDarkMode ? 'text-white' : 'text-black') : 'text-gray-400'} />
-         </button>
-         
-         <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 transition-transform active:scale-90">
-            <Circle size={22} className={isDarkMode ? 'text-white fill-white/20' : 'text-gray-400'} />
-         </button>
-      </nav>
-
-      {/* MAIN REGISTRY GRID */}
-      <main className="max-w-7xl mx-auto px-6 pt-32 pb-48">
-        {activeTab === 'stats' ? (
-          <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 grid grid-cols-1 md:grid-cols-2 gap-6">
-             <div className={`p-10 rounded-[3rem] border backdrop-blur-3xl shadow-sm ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white/60 border-white/40'}`}>
-                <PieChart className="text-gray-400 mb-4" />
-                <h3 className="text-2xl font-bold tracking-tight text-gray-600">Active Portfolio</h3>
-                <p className="text-6xl font-black mt-4 tracking-tighter text-black">547</p>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">Projects Logged</p>
-             </div>
-             <div className={`p-10 rounded-[3rem] border backdrop-blur-3xl shadow-sm ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white/60 border-white/40'}`}>
-                <TrendingUp className="text-gray-400 mb-4" />
-                <h3 className="text-2xl font-bold tracking-tight text-gray-600">Yield Average</h3>
-                <p className="text-6xl font-black mt-4 text-black tracking-tighter">6.4%</p>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">Aggregated Return</p>
-             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 grid-flow-dense animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            {data.map(p => (
-              <ProjectCard 
-                key={p.id} 
-                project={p} 
-                onSelect={onProjectClick}
-                isActive={selectedProject?.id === p.id}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* IN-GRID EXPANDED DATA (Hidden, we use Sidebar or Oval in current model) */}
-        {selectedProject && activeTab === 'home' && (
-          <div className="mt-12 p-10 bg-white/80 backdrop-blur-3xl rounded-[3rem] border border-white shadow-2xl animate-in zoom-in-95 duration-500">
-             <div className="flex justify-between items-start mb-8">
-                <div>
-                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{selectedProject.developer}</p>
-                   <h2 className="text-4xl font-bold tracking-tighter">{selectedProject.name}</h2>
-                </div>
-                <button onClick={() => setSelectedProject(null)} className="p-3 bg-gray-100 rounded-full"><X size={20} className="text-gray-500" /></button>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="bg-gray-50 p-6 rounded-3xl">
-                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Target Yield</p>
-                   <p className="text-3xl font-bold">{selectedProject.yield}</p>
-                </div>
-                <div className="bg-gray-50 p-6 rounded-3xl">
-                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Mins to Downtown</p>
-                   <p className="text-3xl font-bold">{selectedProject.minsDT}m</p>
-                </div>
-                <button className="bg-black text-white rounded-3xl font-bold px-8 active:scale-95 transition-transform flex items-center justify-center gap-2">
-                   <Download size={20} /> Export Factsheet
-                </button>
-             </div>
-          </div>
-        )}
-      </main>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+      {[
+        { top: '5%', left: '8%', w: 700, c: 'rgba(139,92,246,0.07)' },
+        { top: '60%', right: '5%', w: 580, c: 'rgba(56,189,248,0.07)' },
+        { top: '30%', left: '52%', w: 480, c: 'rgba(244,114,182,0.06)' },
+        { bottom: '8%', left: '25%', w: 420, c: 'rgba(16,185,129,0.05)' },
+      ].map((o, i) => (
+        <div key={i} style={{
+          position: 'absolute', top: o.top, left: o.left, right: o.right, bottom: o.bottom,
+          width: o.w, height: o.w, borderRadius: '50%',
+          background: `radial-gradient(circle, ${o.c} 0%, transparent 70%)`,
+          transform: 'translate(-50%,-50%)',
+        }} />
+      ))}
     </div>
   );
 }
 
-```
+/* ─── PILL TAG ───────────────────────────────────────────────────────── */
+function Pill({ hex, hx2, label }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '3px 10px 3px 7px', borderRadius: 20,
+      fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase',
+      background: hex + '18', border: `1px solid ${hex}35`, color: hex,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: `linear-gradient(135deg, ${hex}, ${hx2})`, display: 'inline-block', flexShrink: 0 }} />
+      {label}
+    </span>
+  );
+}
+
+/* ─── PIN CARD (masonry item) ────────────────────────────────────────── */
+function PinCard({ project, index, onClick, saved, onSave }) {
+  const [hov, setHov] = useState(false);
+  const pt = priceTag(toNum(project.price));
+  const ratio = ASPECT_RATIOS[index % ASPECT_RATIOS.length];
+
+  return (
+    <div
+      style={{ marginBottom: 12, breakInside: 'avoid', cursor: 'pointer', display: 'inline-block', width: '100%' }}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      onClick={onClick}
+    >
+      <div style={{
+        borderRadius: 20, overflow: 'hidden',
+        background: 'rgba(255,255,255,0.035)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        border: hov ? `1px solid ${pt.hex}40` : '1px solid rgba(255,255,255,0.07)',
+        boxShadow: hov
+          ? `0 28px 60px rgba(0,0,0,0.65), 0 0 0 1px ${pt.hex}25`
+          : '0 4px 24px rgba(0,0,0,0.35)',
+        transform: hov ? 'translateY(-8px) scale(1.015)' : 'translateY(0) scale(1)',
+        transition: 'all 0.42s cubic-bezier(0.34,1.56,0.64,1)',
+      }}>
+        {/* Image */}
+        <div style={{ position: 'relative', aspectRatio: ratio, overflow: 'hidden' }}>
+          <img
+            src={project.heroImage}
+            alt={project.title}
+            style={{
+              width: '100%', height: '100%', objectFit: 'cover',
+              transform: hov ? 'scale(1.08)' : 'scale(1)',
+              transition: 'transform 0.7s ease',
+            }}
+          />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(4,4,12,0.88) 0%, rgba(4,4,12,0.15) 55%, transparent 100%)' }} />
+
+          {/* Price badge */}
+          <div style={{
+            position: 'absolute', top: 11, left: 11,
+            background: 'rgba(4,4,12,0.62)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255,255,255,0.18)', borderRadius: 16,
+            padding: '5px 12px', fontSize: 12, fontWeight: 800, color: '#fff',
+            letterSpacing: '-0.01em',
+          }}>
+            {project.price}
+          </div>
+
+          {/* Save heart */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onSave(); }}
+            style={{
+              position: 'absolute', top: 11, right: 11,
+              width: 32, height: 32, borderRadius: '50%',
+              background: 'rgba(4,4,12,0.62)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+              border: saved ? `1px solid #f87171` : '1px solid rgba(255,255,255,0.18)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: saved ? '#f87171' : 'rgba(255,255,255,0.55)',
+              cursor: 'pointer',
+              opacity: hov || saved ? 1 : 0,
+              transition: 'opacity 0.25s ease, transform 0.2s ease',
+              transform: saved ? 'scale(1.1)' : 'scale(1)',
+            }}
+          >
+            <Heart size={13} fill={saved ? '#f87171' : 'none'} strokeWidth={saved ? 0 : 2} />
+          </button>
+
+          {/* Bottom developer badge */}
+          <div style={{
+            position: 'absolute', bottom: 10, right: 11,
+            fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.4)',
+            background: 'rgba(4,4,12,0.5)', backdropFilter: 'blur(10px)',
+            padding: '3px 8px', borderRadius: 8,
+          }}>
+            {project.developer}
+          </div>
+        </div>
+
+        {/* Text content */}
+        <div style={{ padding: '12px 14px 15px' }}>
+          <div style={{ marginBottom: 8 }}>
+            <Pill hex={pt.hex} hx2={pt.hx2} label={pt.label} />
+          </div>
+          <h3 style={{
+            fontSize: 15, fontWeight: 700,
+            letterSpacing: '-0.02em', marginBottom: 5, lineHeight: 1.25,
+            color: '#fff',
+          }}>
+            {project.title}
+          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.38)', fontSize: 10, fontWeight: 600, marginBottom: 10, fontFamily: 'system-ui, sans-serif' }}>
+            <MapPin size={9} />
+            {project.location.split(',')[0]}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            {[project.bedrooms, project.paymentPlan, project.handover].map((v, i) => (
+              <span key={i} style={{
+                padding: '2px 8px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+                fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.38)',
+                letterSpacing: '0.04em', fontFamily: 'system-ui, sans-serif',
+              }}>{v}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── SUGGEST MINI CARD ──────────────────────────────────────────────── */
+function SuggestCard({ project, onClick }) {
+  const [hov, setHov] = useState(false);
+  const pt = priceTag(toNum(project.price));
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        width: '100%', textAlign: 'left', cursor: 'pointer',
+        borderRadius: 14, overflow: 'hidden',
+        background: hov ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)',
+        border: hov ? `1px solid ${pt.hex}40` : '1px solid rgba(255,255,255,0.07)',
+        transform: hov ? 'translateY(-3px)' : 'none',
+        transition: 'all 0.28s ease', boxShadow: hov ? `0 12px 32px rgba(0,0,0,0.55)` : 'none',
+      }}
+    >
+      <div style={{ position: 'relative' }}>
+        <img src={project.heroImage} alt={project.title} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(4,4,12,0.85) 0%, transparent 70%)' }} />
+        <div style={{
+          position: 'absolute', bottom: 7, left: 8,
+          fontSize: 10, fontWeight: 800, color: '#fff',
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
+          padding: '2px 7px', borderRadius: 7,
+        }}>{project.price}</div>
+      </div>
+      <div style={{ padding: '8px 10px 10px' }}>
+        <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: pt.hex, marginBottom: 3 }}>{pt.label}</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', lineHeight: 1.3, marginBottom: 2 }}>{project.title}</div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.38)', fontWeight: 600 }}>{project.location.split(',')[0]}</div>
+      </div>
+    </button>
+  );
+}
+
+/* ─── DETAIL DRAWER (Sliding from Right) ─────────────────────────────── */
+function DetailCard({ project: init, onClose, onSelect }) {
+  const [project, setProject] = useState(init);
+  const [tab, setTab] = useState('payment');
+  const [metric, setMetric] = useState('psf');
+  const [imgErr, setImgErr] = useState(false);
+
+  useEffect(() => {
+    setProject(init);
+    setTab('payment');
+    setImgErr(false);
+  }, [init]);
+
+  const similar = useMemo(() => getSimilar(project), [project]);
+  const bm = benchmarks[project.id];
+  const pt = priceTag(toNum(project.price));
+  
+  // Logic to determine secondary vs off-plan
+  const isSecondary = project.handover.toLowerCase().includes('ready');
+
+  const tabBtn = (key, label) => (
+    <button key={key} onClick={() => setTab(key)} style={{
+      flex: 1, padding: '9px 4px', borderRadius: 12, cursor: 'pointer',
+      fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase',
+      background: tab === key ? `${pt.hex}20` : 'transparent',
+      border: tab === key ? `1px solid ${pt.hex}45` : '1px solid transparent',
+      color: tab === key ? pt.hex : 'rgba(255,255,255,0.3)',
+      transition: 'all 0.2s ease', fontFamily: 'system-ui, sans-serif',
+    }}>{label}</button>
+  );
+
+  const chatBubbleStyle = (hex, hx2) => ({
+    background: `linear-gradient(135deg, ${hex}, ${hx2})`, color: '#050612',
+    padding: '12px 18px', borderRadius: '18px 18px 4px 18px', // iOS Right Bubble
+    fontSize: 13, fontWeight: 700, textDecoration: 'none', display: 'inline-block',
+    boxShadow: `0 4px 16px ${hex}25`, transition: 'transform 0.2s ease',
+    cursor: 'pointer'
+  });
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', justifyContent: 'flex-end' }}>
+      <style>{`
+        @keyframes slideInDrawer {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
+      `}</style>
+      
+      {/* Backdrop */}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', cursor: 'pointer' }} onClick={onClose} />
+
+      {/* Drawer Panel */}
+      <div id="drawer-scroll" style={{
+        position: 'relative', width: '100%', maxWidth: 480, height: '100%',
+        background: '#05050f', overflowY: 'auto',
+        animation: 'slideInDrawer 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        display: 'flex', flexDirection: 'column'
+      }}>
+        
+        {/* === MAIN CARD (Distinct styling to look like a contained card) === */}
+        <div style={{
+          background: 'rgba(12,13,26,0.95)', borderBottomLeftRadius: 36, borderBottomRightRadius: 36,
+          borderBottom: `1px solid ${pt.hex}30`, paddingBottom: 24,
+          boxShadow: `0 20px 40px rgba(0,0,0,0.5)`
+        }}>
+          {/* Header overlay */}
+          <div style={{
+            padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%)'
+          }}>
+            <button onClick={onClose} style={{
+              width: 32, height: 32, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', cursor: 'pointer',
+            }}>
+              <X size={16} />
+            </button>
+            <Pill hex={pt.hex} hx2={pt.hx2} label={pt.label} />
+          </div>
+
+          {/* Hero */}
+          <div style={{ position: 'relative', height: 280, overflow: 'hidden' }}>
+            <img
+              src={imgErr ? project.gallery?.exteriors?.[1] || project.heroImage : project.heroImage}
+              alt={project.title}
+              onError={() => setImgErr(true)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+            <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(to top, rgba(12,13,26,1) 0%, rgba(12,13,26,0.2) 60%, transparent 100%)` }} />
+
+            <div style={{ position: 'absolute', bottom: 18, left: 20, right: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.025em', margin: 0, lineHeight: 1.1, color: '#fff' }}>
+                  {project.title}
+                </h2>
+                <div style={{
+                  background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(14px)', border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 12, padding: '5px 10px', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em',
+                  textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)',
+                }}>
+                  {project.developer}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>
+                <MapPin size={10} />{project.location}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: '0 20px 16px' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: pt.hex, marginBottom: 12 }}>{project.price}</div>
+            
+            {/* Quick metrics */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
+              {[['Plan', project.paymentPlan], ['Handover', project.handover], ['Beds', project.bedrooms], ['Size', (project.size || '').split('–')[0]?.trim() || project.size]].map(([l, v]) => (
+                <div key={l} style={{ borderRadius: 12, padding: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginBottom: 4 }}>{l}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+              {[['payment', 'Payment'], ['investor', 'Investor'], ['area', 'Area']].map(([k, l]) => tabBtn(k, l))}
+            </div>
+
+            {/* Tab bodies */}
+            <div style={{ minHeight: 200 }}>
+              {tab === 'payment' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {project.paymentSchedule.map((item, idx) => (
+                    <div key={idx} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '13px 15px', borderRadius: 14,
+                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)', marginBottom: 3 }}>Step {idx + 1}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{item.label}</div>
+                      </div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: pt.hex }}>{item.value}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {tab === 'investor' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {bm && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>{bm.subtitle}</p>
+                        <div style={{ display: 'flex', gap: 5 }}>
+                          {['psf', 'price'].map((v) => (
+                            <button key={v} onClick={() => setMetric(v)} style={{
+                              padding: '4px 11px', borderRadius: 10, cursor: 'pointer',
+                              fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
+                              background: metric === v ? `${pt.hex}20` : 'transparent',
+                              border: metric === v ? `1px solid ${pt.hex}45` : '1px solid rgba(255,255,255,0.06)',
+                              color: metric === v ? pt.hex : 'rgba(255,255,255,0.28)',
+                              transition: 'all 0.2s ease',
+                            }}>
+                              {v === 'psf' ? 'AED/sqft' : 'Price M'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ height: 190 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={bm.data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                            <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
+                            <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.28)', fontSize: 9, fontWeight: 700 }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 9 }} axisLine={false} tickLine={false} />
+                            <Tooltip contentStyle={{ background: '#0c0e20', border: `1px solid ${pt.hex}40`, borderRadius: 12 }} itemStyle={{ color: '#fff', fontWeight: 800, fontSize: 11 }} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                            <Bar dataKey={metric === 'psf' ? 'psf' : 'price'} fill={pt.hex} radius={[7, 7, 2, 2]} barSize={30} opacity={0.85} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </>
+                  )}
+                  {project.investorSnap.map((s, i) => {
+                    const [boldPart, rest] = s.includes(':') ? s.split(/:(.+)/) : [s, ''];
+                    return (
+                      <div key={i} style={{ padding: '12px 14px', borderRadius: 13, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderLeft: `3px solid ${pt.hex}50` }}>
+                        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 1.65, margin: 0 }}>
+                          {rest ? <><strong style={{ color: '#fff' }}>{boldPart}:</strong>{rest}</> : boldPart}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {tab === 'area' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {[
+                    [<GraduationCap size={12} />, 'Education', project.areaSnapshot.schools],
+                    [<Cross size={12} />, 'Healthcare', project.areaSnapshot.hospitals],
+                    [<ShoppingBag size={12} />, 'Shopping', project.areaSnapshot.malls],
+                    [<Trees size={12} />, 'Lifestyle', project.areaSnapshot.recreation],
+                  ].map(([icon, title, items]) => (
+                    <div key={title} style={{ borderRadius: 13, padding: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
+                        <span style={{ color: pt.hex }}>{icon}</span>
+                        <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.5)' }}>{title}</span>
+                      </div>
+                      {items?.slice(0, 3).map((item, idx) => (
+                        <div key={idx} style={{ fontSize: 11, color: 'rgba(255,255,255,0.52)', padding: '4px 0', borderBottom: idx < (items.length - 1 > 2 ? 2 : items.length - 1) ? '1px solid rgba(255,255,255,0.04)' : 'none', lineHeight: 1.45 }}>{item}</div>
+                      ))}
+                    </div>
+                  ))}
+                  
+                  {project.areaSnapshot.commute && (
+                    <div style={{ gridColumn: '1 / -1', borderRadius: 13, padding: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+                        <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.1em', marginBottom: 4 }}>Downtown</span>
+                        <span style={{ fontSize: 14, color: '#fff', fontWeight: 700 }}>{project.areaSnapshot.commute.dt}</span>
+                      </div>
+                      <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.1)' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+                        <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.1em', marginBottom: 4 }}>Marina</span>
+                        <span style={{ fontSize: 14, color: '#fff', fontWeight: 700 }}>{project.areaSnapshot.commute.marina}</span>
+                      </div>
+                      <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.1)' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+                        <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.1em', marginBottom: 4 }}>DXB</span>
+                        <span style={{ fontSize: 14, color: '#fff', fontWeight: 700 }}>{project.areaSnapshot.commute.dxb}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* === iOS/GEMINI CHAT UI CTA === */}
+            <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.3)', marginBottom: 16, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                Ask about this property
+              </div>
+
+              {/* Received message (Agent) */}
+              <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'flex-end' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: `linear-gradient(135deg, ${pt.hex}, ${pt.hx2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#000' }}>
+                  <MessageCircle size={15} />
+                </div>
+                <div style={{
+                  background: 'rgba(255,255,255,0.08)', color: '#fff',
+                  padding: '12px 16px', borderRadius: '18px 18px 18px 4px', // iOS Left Bubble
+                  fontSize: 13, lineHeight: 1.4, maxWidth: '85%', border: '1px solid rgba(255,255,255,0.05)'
+                }}>
+                  Hi! I'm {AGENT}. How can I help you with <strong>{project.title}</strong> today?
+                </div>
+              </div>
+
+              {/* Quick Replies (User Actions) */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                {isSecondary ? (
+                  <a href={waLink(project.title, "send a message to the owner regarding viewing and pricing")} target="_blank" rel="noreferrer" style={chatBubbleStyle(pt.hex, pt.hx2)}>
+                    Send message to owner
+                  </a>
+                ) : (
+                  <>
+                    <a href={waLink(project.title, "request the floor plan")} target="_blank" rel="noreferrer" style={chatBubbleStyle(pt.hex, pt.hx2)}>
+                      Request floor plan
+                    </a>
+                    <a href={waLink(project.title, "check current availability")} target="_blank" rel="noreferrer" style={chatBubbleStyle(pt.hex, pt.hx2)}>
+                      Check availability
+                    </a>
+                    <a href={waLink(project.title, "reach out to the developer directly")} target="_blank" rel="noreferrer" style={chatBubbleStyle(pt.hex, pt.hx2)}>
+                      Message developer
+                    </a>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* === SUGGESTED PROJECTS (Rendered OUTSIDE the main card) === */}
+        {similar.length > 0 && (
+          <div style={{ padding: '24px 20px 40px' }}>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 12 }}>
+              Explore Similar
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+              {similar.map((p) => (
+                <SuggestCard key={p.id} project={p} onClick={() => { 
+                  onSelect(p); 
+                  document.getElementById('drawer-scroll').scrollTo({top: 0, behavior: 'smooth'}); 
+                }} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── FILTER DEFINITIONS ─────────────────────────────────────────────── */
+const FILTERS = [
+  { key: 'all', label: 'All', hex: 'rgba(255,255,255,0.4)' },
+  { key: 'entry', label: '< 5M', hex: '#5eead4' },
+  { key: 'mid', label: '5–15M', hex: '#a78bfa' },
+  { key: 'premium', label: '15–30M', hex: '#f0abfc' },
+  { key: 'ultra', label: 'AED 30M+', hex: '#fcd34d' },
+];
+
+/* ─── MAIN EXPORT ────────────────────────────────────────────────────── */
+export default function App() {
+  const [selected, setSelected] = useState(null);
+  const [saved, setSaved] = useState(new Set());
+  const [filter, setFilter] = useState('all');
+
+  const toggleSave = (id) =>
+    setSaved((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const filtered = useMemo(
+    () => filter === 'all' ? projects : projects.filter((p) => priceTag(toNum(p.price)).key === filter),
+    [filter]
+  );
+
+  // Prevent body scroll when detail is open
+  useEffect(() => {
+    document.body.style.overflow = selected ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [selected]);
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#05050f', color: '#fff', fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', position: 'relative' }}>
+      <style>{`
+        .masonry-grid {
+          column-count: 2;
+          column-gap: 12px;
+        }
+        @media (min-width: 640px) {
+          .masonry-grid { column-count: 3; column-gap: 16px; }
+        }
+        @media (min-width: 1024px) {
+          .masonry-grid { column-count: 4; }
+        }
+        @media (min-width: 1280px) {
+          .masonry-grid { column-count: 5; }
+        }
+      `}</style>
+      <Orbs />
+
+      {/* Sticky header */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 100,
+        background: 'rgba(5,5,15,0.82)', backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        padding: '13px 20px',
+        display: 'flex', alignItems: 'center', gap: 16,
+      }}>
+        {/* Branding */}
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)' }}>
+            Dubai Portfolio
+          </div>
+          <h1 style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
+            {AGENT}
+          </h1>
+        </div>
+
+        <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
+
+        {/* Filter pills */}
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', flex: 1, paddingBottom: 1 }}>
+          {FILTERS.map((f) => {
+            const active = filter === f.key;
+            return (
+              <button key={f.key} onClick={() => setFilter(f.key)} style={{
+                flexShrink: 0, padding: '5px 13px', borderRadius: 20,
+                fontSize: 9, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase',
+                background: active ? f.hex + '1c' : 'rgba(255,255,255,0.04)',
+                border: active ? `1px solid ${f.hex}40` : '1px solid rgba(255,255,255,0.07)',
+                color: active ? f.hex : 'rgba(255,255,255,0.3)', cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}>{f.label}</button>
+            );
+          })}
+        </div>
+
+        {/* Saved count */}
+        {saved.size > 0 && (
+          <div style={{
+            flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
+            padding: '5px 12px', borderRadius: 20,
+            background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.25)',
+            fontSize: 10, fontWeight: 800, color: '#f87171',
+          }}>
+            <Bookmark size={11} />
+            {saved.size}
+          </div>
+        )}
+
+        {/* WhatsApp */}
+        <a href={`https://wa.me/${PHONE}`} target="_blank" rel="noreferrer" style={{
+          flexShrink: 0, display: 'flex', alignItems: 'center', gap: 7,
+          padding: '6px 14px', borderRadius: 20,
+          background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+          fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
+          color: '#fff', textDecoration: 'none',
+        }}>
+          <MessageCircle size={11} /> WhatsApp
+        </a>
+      </header>
+
+      {/* Board section header */}
+      <div style={{ padding: '24px 16px 4px', position: 'relative', zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <SlidersHorizontal size={12} style={{ color: 'rgba(255,255,255,0.25)' }} />
+          <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)' }}>
+            {filtered.length} {filtered.length === 1 ? 'Property' : 'Properties'} · Tap to explore
+          </span>
+        </div>
+      </div>
+
+      {/* Masonry grid */}
+      <div style={{ padding: '12px 16px 40px', position: 'relative', zIndex: 10 }}>
+        <div className="masonry-grid">
+          {filtered.map((p, idx) => (
+            <PinCard
+              key={p.id}
+              project={p}
+              index={projects.indexOf(p)}
+              onClick={() => setSelected(p)}
+              saved={saved.has(p.id)}
+              onSave={() => toggleSave(p.id)}
+            />
+          ))}
+        </div>
+
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '80px 20px', color: 'rgba(255,255,255,0.18)' }}>
+            <TrendingUp size={34} style={{ margin: '0 auto 14px', opacity: 0.25, display: 'block' }} />
+            <p style={{ fontSize: 15, fontWeight: 700 }}>No properties in this range</p>
+          </div>
+        )}
+      </div>
+
+      {/* Slide-over Detail Drawer */}
+      {selected && (
+        <DetailCard project={selected} onClose={() => setSelected(null)} onSelect={setSelected} />
+      )}
+    </div>
+  );
+}
